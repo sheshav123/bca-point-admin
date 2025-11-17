@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BCA Point 2.0 - Admin Panel</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 BCA Point 2.0 Admin Panel</h1>
+            <button id="logoutBtn" class="btn btn-danger" style="display: none;">Logout</button>
+        </header>
+
+        <div id="loginSection" class="section">
+            <div class="card">
+                <h2>Admin Login</h2>
+                <form id="passwordLoginForm">
+                    <input type="password" id="adminPassword" placeholder="Enter Admin Password" required>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="adminSection" style="display: none;">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="categories">Categories</button>
+                <button class="tab-btn" data-tab="subcategories">Subcategories</button>
+                <button class="tab-btn" data-tab="materials">Study Materials</button>
+            </div>
+
+            <!-- Categories Tab -->
+            <div id="categories" class="tab-content active">
+                <div class="card">
+                    <h2>Add Category</h2>
+                    <form id="categoryForm">
+                        <input type="text" id="categoryTitle" placeholder="Category Title" required>
+                        <textarea id="categoryDescription" placeholder="Description (optional)"></textarea>
+                        <input type="number" id="categoryOrder" placeholder="Order" value="0" required>
+                        <button type="submit" class="btn btn-primary">Add Category</button>
+                    </form>
+                </div>
+                <div class="card">
+                    <h2>Existing Categories</h2>
+                    <div id="categoriesList"></div>
+                </div>
+            </div>
+
+            <!-- Subcategories Tab -->
+            <div id="subcategories" class="tab-content">
+                <div class="card">
+                    <h2>Add Subcategory</h2>
+                    <form id="subcategoryForm">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Step 1: Select Category</label>
+                        <select id="subcategoryCategory" required>
+                            <option value="">📁 Select a Category</option>
+                        </select>
+                        
+                        <div id="subcategoryLevels"></div>
+                        
+                        <div style="margin-top: 10px; padding: 10px; background: #f0f0ff; border-radius: 8px; font-size: 14px; display: none;" id="selectedPath">
+                            <strong>Selected Path:</strong> <span id="pathDisplay"></span>
+                        </div>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; margin-top: 15px; display: block;">Step 2: Enter Subcategory Details</label>
+                        <input type="text" id="subcategoryTitle" placeholder="Subcategory Title" required>
+                        <textarea id="subcategoryDescription" placeholder="Description (optional)"></textarea>
+                        <input type="number" id="subcategoryOrder" placeholder="Order" value="0" required>
+                        <button type="submit" class="btn btn-primary">Add Subcategory</button>
+                    </form>
+                </div>
+                <div class="card">
+                    <h2>Existing Subcategories (Tree View)</h2>
+                    <div id="subcategoriesList"></div>
+                </div>
+            </div>
+
+            <!-- Study Materials Tab -->
+            <div id="materials" class="tab-content">
+                <div class="card">
+                    <h2>Add Study Material</h2>
+                    <form id="materialForm">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Step 1: Select Location</label>
+                        <select id="materialCategory" required>
+                            <option value="">📁 Select a Category</option>
+                        </select>
+                        
+                        <div id="materialLevels"></div>
+                        
+                        <div style="margin-top: 10px; padding: 10px; background: #f0f0ff; border-radius: 8px; font-size: 14px; display: none;" id="materialSelectedPath">
+                            <strong>Selected Path:</strong> <span id="materialPathDisplay"></span>
+                        </div>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; margin-top: 15px; display: block;">Step 2: Enter Material Details</label>
+                        <input type="text" id="materialTitle" placeholder="Material Title" required>
+                        <textarea id="materialDescription" placeholder="Description (optional)"></textarea>
+                        <input type="file" id="materialPdf" accept=".pdf" required>
+                        <input type="number" id="materialOrder" placeholder="Order" value="0" required>
+                        <button type="submit" class="btn btn-primary">Upload Material</button>
+                        <div id="uploadProgress" style="display: none;">
+                            <progress id="progressBar" value="0" max="100"></progress>
+                            <span id="progressText">0%</span>
+                        </div>
+                    </form>
+                </div>
+                <div class="card">
+                    <h2>Existing Study Materials</h2>
+                    <div id="materialsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDbGQvEoVsBqLYiiYsy_5JD3Xz6TUKIq0c",
+            authDomain: "bca-point-2.firebaseapp.com",
+            projectId: "bca-point-2",
+            storageBucket: "bca-point-2.firebasestorage.app",
+            messagingSenderId: "172385715450",
+            appId: "1:172385715450:web:d87c9818b5990e82b0b543",
+            measurementId: "G-HNGS5B7N9Y"
+        };
+
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, updateDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // Admin password (you can change this)
+        const ADMIN_PASSWORD = 'admin123';
+
+        // DOM Elements
+        const loginSection = document.getElementById('loginSection');
+        const adminSection = document.getElementById('adminSection');
+        const passwordLoginForm = document.getElementById('passwordLoginForm');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // Check if already logged in
+        if (sessionStorage.getItem('adminLoggedIn') === 'true') {
+            loginSection.style.display = 'none';
+            adminSection.style.display = 'block';
+            logoutBtn.style.display = 'block';
+            loadAllData();
+        }
+
+        // Password Login
+        passwordLoginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const password = document.getElementById('adminPassword').value;
+            
+            if (password === ADMIN_PASSWORD) {
+                sessionStorage.setItem('adminLoggedIn', 'true');
+                loginSection.style.display = 'none';
+                adminSection.style.display = 'block';
+                logoutBtn.style.display = 'block';
+                loadAllData();
+            } else {
+                alert('Incorrect password!');
+            }
+        });
+
+        // Sign Out
+        logoutBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to logout?')) {
+                sessionStorage.removeItem('adminLoggedIn');
+                loginSection.style.display = 'flex';
+                adminSection.style.display = 'none';
+                logoutBtn.style.display = 'none';
+            }
+        });
+
+        // Tab Navigation
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.dataset.tab;
+                
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                btn.classList.add('active');
+                document.getElementById(tabName).classList.add('active');
+            });
+        });
+
+        // Categories
+        document.getElementById('categoryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const title = document.getElementById('categoryTitle').value;
+            const description = document.getElementById('categoryDescription').value;
+            const order = parseInt(document.getElementById('categoryOrder').value);
+            
+            try {
+                await addDoc(collection(db, 'categories'), {
+                    title,
+                    description: description || null,
+                    order,
+                    createdAt: new Date().toISOString()
+                });
+                
+                alert('Category added successfully!');
+                e.target.reset();
+                loadCategories();
+            } catch (error) {
+                alert('Error adding category: ' + error.message);
+            }
+        });
+
+        // Global variables for cascading dropdowns
+        let allCategories = [];
+        let allSubcategories = [];
+
+        async function loadCategories() {
+            const q = query(collection(db, 'categories'), orderBy('order'));
+            const snapshot = await getDocs(q);
+            
+            allCategories = [];
+            const categoriesList = document.getElementById('categoriesList');
+            const subcategoryCategory = document.getElementById('subcategoryCategory');
+            const materialCategory = document.getElementById('materialCategory');
+            
+            categoriesList.innerHTML = '';
+            subcategoryCategory.innerHTML = '<option value="">📁 Select a Category</option>';
+            materialCategory.innerHTML = '<option value="">📁 Select a Category</option>';
+            
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                allCategories.push({ id: doc.id, ...data });
+                
+                const item = document.createElement('div');
+                item.className = 'item';
+                item.innerHTML = `
+                    <div class="item-info">
+                        <h3>${data.title}</h3>
+                        <p>${data.description || 'No description'} • Order: ${data.order}</p>
+                    </div>
+                    <div class="item-actions">
+                        <button class="btn btn-edit" onclick="editCategory('${doc.id}', '${data.title.replace(/'/g, "\\'")}', '${(data.description || '').replace(/'/g, "\\'")}', ${data.order})">Edit</button>
+                        <button class="btn btn-delete" onclick="deleteCategory('${doc.id}')">Delete</button>
+                    </div>
+                `;
+                categoriesList.appendChild(item);
+                
+                const option1 = document.createElement('option');
+                option1.value = doc.id;
+                option1.textContent = `📁 ${data.title}`;
+                subcategoryCategory.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = doc.id;
+                option2.textContent = `📁 ${data.title}`;
+                materialCategory.appendChild(option2);
+            });
+            
+            setupCascadingDropdowns();
+        }
+        
+        function setupCascadingDropdowns() {
+            // Subcategory cascading dropdowns
+            document.getElementById('subcategoryCategory').addEventListener('change', function() {
+                updateSubcategoryLevels(this.value, 'subcategory');
+            });
+            
+            // Material cascading dropdowns
+            document.getElementById('materialCategory').addEventListener('change', function() {
+                updateSubcategoryLevels(this.value, 'material');
+            });
+        }
+        
+        function updateSubcategoryLevels(categoryId, type) {
+            const levelsContainer = document.getElementById(type === 'subcategory' ? 'subcategoryLevels' : 'materialLevels');
+            const pathDisplay = document.getElementById(type === 'subcategory' ? 'selectedPath' : 'materialSelectedPath');
+            const pathText = document.getElementById(type === 'subcategory' ? 'pathDisplay' : 'materialPathDisplay');
+            
+            levelsContainer.innerHTML = '';
+            
+            if (!categoryId) {
+                pathDisplay.style.display = 'none';
+                return;
+            }
+            
+            const category = allCategories.find(c => c.id === categoryId);
+            let currentPath = `📁 ${category.title}`;
+            pathText.textContent = currentPath;
+            pathDisplay.style.display = 'block';
+            
+            addSubcategoryLevel(categoryId, 'category', levelsContainer, type, currentPath, 1);
+        }
+        
+        function addSubcategoryLevel(parentId, parentType, container, formType, currentPath, level) {
+            const children = allSubcategories.filter(s => 
+                (s.parentType === parentType && s.parentId === parentId) ||
+                (parentType === 'category' && s.categoryId === parentId && !s.parentType)
+            );
+            
+            if (children.length === 0) return;
+            
+            const select = document.createElement('select');
+            select.className = 'subcategory-level-select';
+            select.style.marginTop = '10px';
+            select.innerHTML = `<option value="">📂 Select Level ${level} (Optional)</option>`;
+            
+            children.forEach(child => {
+                const option = document.createElement('option');
+                option.value = child.id;
+                option.textContent = `${'  '.repeat(level)}📂 ${child.title}`;
+                select.appendChild(option);
+            });
+            
+            select.addEventListener('change', function() {
+                // Remove all subsequent levels
+                const allSelects = container.querySelectorAll('.subcategory-level-select');
+                const currentIndex = Array.from(allSelects).indexOf(this);
+                for (let i = currentIndex + 1; i < allSelects.length; i++) {
+                    allSelects[i].remove();
+                }
+                
+                if (this.value) {
+                    const selected = allSubcategories.find(s => s.id === this.value);
+                    const newPath = currentPath + ` > 📂 ${selected.title}`;
+                    const pathText = document.getElementById(formType === 'subcategory' ? 'pathDisplay' : 'materialPathDisplay');
+                    pathText.textContent = newPath;
+                    
+                    addSubcategoryLevel(this.value, 'subcategory', container, formType, newPath, level + 1);
+                } else {
+                    const pathText = document.getElementById(formType === 'subcategory' ? 'pathDisplay' : 'materialPathDisplay');
+                    pathText.textContent = currentPath;
+                }
+            });
+            
+            container.appendChild(select);
+        }
+        
+        function getSelectedParent(type) {
+            const categorySelect = document.getElementById(type === 'subcategory' ? 'subcategoryCategory' : 'materialCategory');
+            const levelsContainer = document.getElementById(type === 'subcategory' ? 'subcategoryLevels' : 'materialLevels');
+            
+            const categoryId = categorySelect.value;
+            if (!categoryId) return null;
+            
+            const levelSelects = levelsContainer.querySelectorAll('.subcategory-level-select');
+            let lastSelected = null;
+            
+            for (let select of levelSelects) {
+                if (select.value) {
+                    lastSelected = { type: 'subcategory', id: select.value };
+                } else {
+                    break;
+                }
+            }
+            
+            if (lastSelected) {
+                return lastSelected;
+            } else {
+                return { type: 'category', id: categoryId };
+            }
+        }
+
+        window.editCategory = async (id, title, description, order) => {
+            const newTitle = prompt('Edit Category Title:', title);
+            if (newTitle === null) return;
+            
+            const newDescription = prompt('Edit Description:', description);
+            if (newDescription === null) return;
+            
+            const newOrder = prompt('Edit Order:', order);
+            if (newOrder === null) return;
+            
+            try {
+                await updateDoc(doc(db, 'categories', id), {
+                    title: newTitle,
+                    description: newDescription || null,
+                    order: parseInt(newOrder)
+                });
+                alert('Category updated successfully!');
+                loadAllData();
+            } catch (error) {
+                alert('Error updating category: ' + error.message);
+            }
+        };
+
+        window.deleteCategory = async (id) => {
+            if (confirm('Are you sure? This will also delete all subcategories and materials under this category.')) {
+                try {
+                    await deleteDoc(doc(db, 'categories', id));
+                    alert('Category deleted successfully!');
+                    loadAllData();
+                } catch (error) {
+                    alert('Error deleting category: ' + error.message);
+                }
+            }
+        };
+
+        // Subcategories
+        document.getElementById('subcategoryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const parent = getSelectedParent('subcategory');
+            if (!parent) {
+                alert('Please select a category first!');
+                return;
+            }
+            
+            const title = document.getElementById('subcategoryTitle').value;
+            const description = document.getElementById('subcategoryDescription').value;
+            const order = parseInt(document.getElementById('subcategoryOrder').value);
+            
+            try {
+                await addDoc(collection(db, 'subcategories'), {
+                    parentType: parent.type,
+                    parentId: parent.id,
+                    title,
+                    description: description || null,
+                    order,
+                    createdAt: new Date().toISOString()
+                });
+                
+                alert('Subcategory added successfully!');
+                e.target.reset();
+                document.getElementById('subcategoryLevels').innerHTML = '';
+                document.getElementById('selectedPath').style.display = 'none';
+                loadAllData();
+            } catch (error) {
+                alert('Error adding subcategory: ' + error.message);
+            }
+        });
+
+        async function loadSubcategories() {
+            const q = query(collection(db, 'subcategories'), orderBy('order'));
+            const snapshot = await getDocs(q);
+            const categoriesSnapshot = await getDocs(collection(db, 'categories'));
+            
+            const categoriesMap = {};
+            categoriesSnapshot.forEach(doc => {
+                categoriesMap[doc.id] = doc.data().title;
+            });
+            
+            const subcategoriesMap = {};
+            const subcategoriesArray = [];
+            allSubcategories = []; // Update global array
+            snapshot.forEach(doc => {
+                const data = { id: doc.id, ...doc.data() };
+                subcategoriesMap[doc.id] = data;
+                subcategoriesArray.push(data);
+                allSubcategories.push(data); // Update global array
+            });
+            
+            const subcategoriesList = document.getElementById('subcategoriesList');
+            
+            subcategoriesList.innerHTML = '';
+            
+            // Helper function to calculate depth level
+            function getDepthLevel(subcatId, subcatsMap) {
+                const subcat = subcatsMap[subcatId];
+                if (!subcat) return 0;
+                
+                if (subcat.parentType === 'category') {
+                    return 0;
+                } else {
+                    return 1 + getDepthLevel(subcat.parentId, subcatsMap);
+                }
+            }
+            
+            // Helper function to build path
+            function buildPath(subcatId, subcatsMap, catsMap) {
+                const subcat = subcatsMap[subcatId];
+                if (!subcat) return '';
+                
+                if (subcat.parentType === 'category') {
+                    return catsMap[subcat.parentId] || 'Unknown';
+                } else {
+                    const parentPath = buildPath(subcat.parentId, subcatsMap, catsMap);
+                    return parentPath ? `${parentPath} > ${subcatsMap[subcat.parentId]?.title || 'Unknown'}` : '';
+                }
+            }
+            
+            // Build tree structure grouped by category
+            const treeByCategory = {};
+            
+            subcategoriesArray.forEach((data) => {
+                const path = buildPath(data.id, subcategoriesMap, categoriesMap);
+                const fullPath = path ? `${path} > ${data.title}` : data.title;
+                const level = getDepthLevel(data.id, subcategoriesMap);
+                
+                // Get root category
+                let rootCategoryId = data.parentId;
+                let rootCategoryName = '';
+                if (data.parentType === 'category') {
+                    rootCategoryId = data.parentId;
+                    rootCategoryName = categoriesMap[rootCategoryId] || 'Unknown';
+                } else {
+                    // Find root category by traversing up
+                    let current = data;
+                    while (current.parentType !== 'category') {
+                        current = subcategoriesMap[current.parentId];
+                        if (!current) break;
+                    }
+                    if (current) {
+                        rootCategoryId = current.parentId;
+                        rootCategoryName = categoriesMap[rootCategoryId] || 'Unknown';
+                    }
+                }
+                
+                if (!treeByCategory[rootCategoryId]) {
+                    treeByCategory[rootCategoryId] = {
+                        name: rootCategoryName,
+                        items: []
+                    };
+                }
+                
+                treeByCategory[rootCategoryId].items.push({
+                    id: data.id,
+                    data: data,
+                    path: path,
+                    fullPath: fullPath,
+                    level: level
+                });
+            });
+            
+            // Display tree structure
+            Object.keys(treeByCategory).forEach(catId => {
+                const category = treeByCategory[catId];
+                
+                // Category header
+                const categoryHeader = document.createElement('div');
+                categoryHeader.style.cssText = 'font-weight: bold; font-size: 16px; color: #667eea; margin: 20px 0 10px 0; padding: 10px; background: #f0f0ff; border-radius: 8px;';
+                categoryHeader.textContent = `📁 ${category.name}`;
+                subcategoriesList.appendChild(categoryHeader);
+                
+                // Sort items by level and order
+                category.items.sort((a, b) => {
+                    if (a.level !== b.level) return a.level - b.level;
+                    return a.data.order - b.data.order;
+                });
+                
+                // Display items
+                category.items.forEach(item => {
+                    const treeItem = document.createElement('div');
+                    treeItem.className = `tree-item level-${Math.min(item.level, 4)}`;
+                    treeItem.innerHTML = `
+                        <div class="tree-item-header">
+                            <div>
+                                <div class="tree-item-title">${'└─ '.repeat(item.level)}${item.data.title}</div>
+                                <div class="tree-item-path">${item.fullPath} • Order: ${item.data.order}</div>
+                                ${item.data.description ? `<div style="font-size: 13px; color: #888; margin-top: 4px;">${item.data.description}</div>` : ''}
+                            </div>
+                            <div class="tree-item-actions">
+                                <button class="btn btn-edit" onclick="editSubcategory('${item.id}', '${item.data.title.replace(/'/g, "\\'")}', '${(item.data.description || '').replace(/'/g, "\\'")}', ${item.data.order})">Edit</button>
+                                <button class="btn btn-delete" onclick="deleteSubcategory('${item.id}')">Delete</button>
+                            </div>
+                        </div>
+                    `;
+                    subcategoriesList.appendChild(treeItem);
+                });
+            });
+            
+        }
+
+        window.editSubcategory = async (id, title, description, order) => {
+            const newTitle = prompt('Edit Subcategory Title:', title);
+            if (newTitle === null) return;
+            
+            const newDescription = prompt('Edit Description:', description);
+            if (newDescription === null) return;
+            
+            const newOrder = prompt('Edit Order:', order);
+            if (newOrder === null) return;
+            
+            try {
+                await updateDoc(doc(db, 'subcategories', id), {
+                    title: newTitle,
+                    description: newDescription || null,
+                    order: parseInt(newOrder)
+                });
+                alert('Subcategory updated successfully!');
+                loadAllData();
+            } catch (error) {
+                alert('Error updating subcategory: ' + error.message);
+            }
+        };
+
+        window.deleteSubcategory = async (id) => {
+            if (confirm('Are you sure? This will also delete all nested subcategories and materials.')) {
+                try {
+                    await deleteDoc(doc(db, 'subcategories', id));
+                    alert('Subcategory deleted successfully!');
+                    loadAllData();
+                } catch (error) {
+                    alert('Error deleting subcategory: ' + error.message);
+                }
+            }
+        };
+
+        // Study Materials
+        document.getElementById('materialForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const parent = getSelectedParent('material');
+            if (!parent) {
+                alert('Please select a category first!');
+                return;
+            }
+            
+            // Materials must be added to subcategories, not categories
+            if (parent.type === 'category') {
+                alert('Please select a subcategory! Materials cannot be added directly to categories.');
+                return;
+            }
+            
+            const subcategoryId = parent.id;
+            const title = document.getElementById('materialTitle').value;
+            const description = document.getElementById('materialDescription').value;
+            const order = parseInt(document.getElementById('materialOrder').value);
+            const file = document.getElementById('materialPdf').files[0];
+            
+            if (!file) {
+                alert('Please select a PDF file');
+                return;
+            }
+            
+            try {
+                document.getElementById('uploadProgress').style.display = 'block';
+                
+                const storageRef = ref(storage, `study_materials/${Date.now()}_${file.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, file);
+                
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        document.getElementById('progressBar').value = progress;
+                        document.getElementById('progressText').textContent = Math.round(progress) + '%';
+                    },
+                    (error) => {
+                        alert('Upload error: ' + error.message);
+                        document.getElementById('uploadProgress').style.display = 'none';
+                    },
+                    async () => {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        
+                        await addDoc(collection(db, 'studyMaterials'), {
+                            subcategoryId,
+                            title,
+                            description: description || null,
+                            pdfUrl: downloadURL,
+                            order,
+                            createdAt: new Date().toISOString()
+                        });
+                        
+                        alert('Study material uploaded successfully!');
+                        e.target.reset();
+                        document.getElementById('uploadProgress').style.display = 'none';
+                        loadMaterials();
+                    }
+                );
+            } catch (error) {
+                alert('Error uploading material: ' + error.message);
+                document.getElementById('uploadProgress').style.display = 'none';
+            }
+        });
+
+        async function loadMaterials() {
+            const q = query(collection(db, 'studyMaterials'), orderBy('order'));
+            const snapshot = await getDocs(q);
+            const subcategoriesSnapshot = await getDocs(collection(db, 'subcategories'));
+            
+            const subcategoriesMap = {};
+            subcategoriesSnapshot.forEach(doc => {
+                subcategoriesMap[doc.id] = doc.data().title;
+            });
+            
+            const materialsList = document.getElementById('materialsList');
+            materialsList.innerHTML = '';
+            
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const subcategoryTitle = subcategoriesMap[data.subcategoryId] || 'Unknown';
+                
+                const item = document.createElement('div');
+                item.className = 'item';
+                item.innerHTML = `
+                    <div class="item-info">
+                        <h3>${data.title}</h3>
+                        <p>Subcategory: ${subcategoryTitle} • ${data.description || 'No description'} • Order: ${data.order}</p>
+                        <a href="${data.pdfUrl}" target="_blank" style="color: #667eea; font-size: 14px;">View PDF</a>
+                    </div>
+                    <div class="item-actions">
+                        <button class="btn btn-edit" onclick="editMaterial('${doc.id}', '${data.title.replace(/'/g, "\\'")}', '${(data.description || '').replace(/'/g, "\\'")}', ${data.order})">Edit</button>
+                        <button class="btn btn-delete" onclick="deleteMaterial('${doc.id}')">Delete</button>
+                    </div>
+                `;
+                materialsList.appendChild(item);
+            });
+        }
+
+        window.editMaterial = async (id, title, description, order) => {
+            const newTitle = prompt('Edit Material Title:', title);
+            if (newTitle === null) return;
+            
+            const newDescription = prompt('Edit Description:', description);
+            if (newDescription === null) return;
+            
+            const newOrder = prompt('Edit Order:', order);
+            if (newOrder === null) return;
+            
+            try {
+                await updateDoc(doc(db, 'studyMaterials', id), {
+                    title: newTitle,
+                    description: newDescription || null,
+                    order: parseInt(newOrder)
+                });
+                alert('Material updated successfully!');
+                loadAllData();
+            } catch (error) {
+                alert('Error updating material: ' + error.message);
+            }
+        };
+
+        window.deleteMaterial = async (id) => {
+            if (confirm('Are you sure you want to delete this material?')) {
+                try {
+                    await deleteDoc(doc(db, 'studyMaterials', id));
+                    alert('Material deleted successfully!');
+                    loadAllData();
+                } catch (error) {
+                    alert('Error deleting material: ' + error.message);
+                }
+            }
+        };
+
+        async function loadAllData() {
+            await loadCategories();
+            await loadSubcategories();
+            await loadMaterials();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Login</title>
+</head>
+<body>
+    <h1>Test Login</h1>
+    <form id="testForm">
+        <input type="password" id="testPassword" placeholder="Enter password">
+        <button type="submit">Test</button>
+    </form>
+    <p id="result"></p>
+
+    <script>
+        const ADMIN_PASSWORD = 'admin123';
+        
+        document.getElementById('testForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const password = document.getElementById('testPassword').value;
+            const result = document.getElementById('result');
+            
+            if (password === ADMIN_PASSWORD) {
+                result.textContent = '✅ Password correct! The login should work.';
+                result.style.color = 'green';
+            } else {
+                result.textContent = '❌ Password incorrect. You entered: ' + password;
+                result.style.color = 'red';
+            }
+        });
+    </script>
+</body>
+</html>
