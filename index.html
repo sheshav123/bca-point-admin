@@ -786,6 +786,107 @@
             }
         };
 
+        // Notifications
+        const notificationForm = document.getElementById('notificationForm');
+        if (notificationForm) {
+            console.log('✅ Notification form found');
+            notificationForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const type = document.getElementById('notificationType').value;
+                const title = document.getElementById('notificationTitle').value;
+                const message = document.getElementById('notificationMessage').value;
+                const audience = document.getElementById('notificationAudience').value;
+                
+                console.log('📤 Sending notification:', { type, title, message, audience });
+                
+                try {
+                    const docRef = await addDoc(collection(db, 'notifications'), {
+                        type,
+                        title,
+                        message,
+                        audience,
+                        createdAt: new Date().toISOString(),
+                        read: false
+                    });
+                    
+                    console.log('✅ Notification sent with ID:', docRef.id);
+                    alert('📢 Notification sent successfully!\n\nCheck your app now!');
+                    e.target.reset();
+                    loadNotifications();
+                } catch (error) {
+                    console.error('❌ Error:', error);
+                    alert('Error: ' + error.message);
+                }
+            });
+        }
+
+        async function loadNotifications() {
+            const notificationsList = document.getElementById('notificationsList');
+            if (!notificationsList) return;
+            
+            try {
+                const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
+                const snapshot = await getDocs(q);
+                
+                notificationsList.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    notificationsList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No notifications sent yet</p>';
+                    return;
+                }
+                
+                const typeIcons = {
+                    'new_category': '🆕',
+                    'new_material': '📄',
+                    'premium': '👑',
+                    'announcement': '📣',
+                    'update': '🔄'
+                };
+                
+                const audienceLabels = {
+                    'all': 'All Users',
+                    'free': 'Free Users',
+                    'premium': 'Premium Users'
+                };
+                
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const date = new Date(data.createdAt).toLocaleString();
+                    
+                    const item = document.createElement('div');
+                    item.className = 'item';
+                    item.innerHTML = `
+                        <div class="item-info">
+                            <h3>${typeIcons[data.type] || '📢'} ${data.title}</h3>
+                            <p>${data.message}</p>
+                            <p style="font-size: 12px; color: #999; margin-top: 5px;">
+                                👥 ${audienceLabels[data.audience]} • 📅 ${date}
+                            </p>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-delete" onclick="deleteNotification('${doc.id}')">Delete</button>
+                        </div>
+                    `;
+                    notificationsList.appendChild(item);
+                });
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+            }
+        }
+
+        window.deleteNotification = async (id) => {
+            if (confirm('Delete this notification?')) {
+                try {
+                    await deleteDoc(doc(db, 'notifications', id));
+                    alert('Deleted!');
+                    loadNotifications();
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
+            }
+        };
+
         async function loadAllData() {
             await loadCategories();
             await loadSubcategories();
