@@ -495,10 +495,98 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Notifications
+    document.getElementById('notificationForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const type = document.getElementById('notificationType').value;
+        const title = document.getElementById('notificationTitle').value;
+        const message = document.getElementById('notificationMessage').value;
+        const audience = document.getElementById('notificationAudience').value;
+        
+        try {
+            await addDoc(collection(db, 'notifications'), {
+                type,
+                title,
+                message,
+                audience,
+                createdAt: new Date().toISOString(),
+                read: false
+            });
+            
+            alert('📢 Notification sent successfully!');
+            e.target.reset();
+            loadNotifications();
+        } catch (error) {
+            alert('Error sending notification: ' + error.message);
+        }
+    });
+
+    async function loadNotifications() {
+        const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        
+        const notificationsList = document.getElementById('notificationsList');
+        notificationsList.innerHTML = '';
+        
+        if (snapshot.empty) {
+            notificationsList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No notifications sent yet</p>';
+            return;
+        }
+        
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            const date = new Date(data.createdAt).toLocaleString();
+            
+            const typeIcons = {
+                'new_category': '🆕',
+                'new_material': '📄',
+                'premium': '👑',
+                'announcement': '📣',
+                'update': '🔄'
+            };
+            
+            const audienceLabels = {
+                'all': 'All Users',
+                'free': 'Free Users',
+                'premium': 'Premium Users'
+            };
+            
+            const item = document.createElement('div');
+            item.className = 'item';
+            item.innerHTML = `
+                <div class="item-info">
+                    <h3>${typeIcons[data.type] || '📢'} ${data.title}</h3>
+                    <p>${data.message}</p>
+                    <p style="font-size: 12px; color: #999; margin-top: 5px;">
+                        👥 ${audienceLabels[data.audience]} • 📅 ${date}
+                    </p>
+                </div>
+                <div class="item-actions">
+                    <button class="btn btn-delete" onclick="deleteNotification('${doc.id}')">Delete</button>
+                </div>
+            `;
+            notificationsList.appendChild(item);
+        });
+    }
+
+    window.deleteNotification = async (id) => {
+        if (confirm('Are you sure you want to delete this notification?')) {
+            try {
+                await deleteDoc(doc(db, 'notifications', id));
+                alert('Notification deleted successfully!');
+                loadNotifications();
+            } catch (error) {
+                alert('Error deleting notification: ' + error.message);
+            }
+        }
+    };
+
     // Load all data
     async function loadAllData() {
         await loadCategories();
         await loadSubcategories();
         await loadMaterials();
+        await loadNotifications();
     }
 });

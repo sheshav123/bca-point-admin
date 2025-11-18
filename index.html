@@ -29,6 +29,7 @@
                 <button class="tab-btn active" data-tab="categories">Categories</button>
                 <button class="tab-btn" data-tab="subcategories">Subcategories</button>
                 <button class="tab-btn" data-tab="materials">Study Materials</button>
+                <button class="tab-btn" data-tab="notifications">📢 Notifications</button>
             </div>
 
             <!-- Categories Tab -->
@@ -119,6 +120,44 @@
                 <div class="card">
                     <h2>Existing Study Materials</h2>
                     <div id="materialsList"></div>
+                </div>
+            </div>
+
+            <!-- Notifications Tab -->
+            <div id="notifications" class="tab-content">
+                <div class="card">
+                    <h2>📢 Send In-App Notification</h2>
+                    <form id="notificationForm">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Notification Type</label>
+                        <select id="notificationType" required>
+                            <option value="">Select Type</option>
+                            <option value="new_category">🆕 New Category Added</option>
+                            <option value="new_material">📄 New Material Added</option>
+                            <option value="premium">👑 Join Premium</option>
+                            <option value="announcement">📣 General Announcement</option>
+                            <option value="update">🔄 App Update</option>
+                        </select>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Title</label>
+                        <input type="text" id="notificationTitle" placeholder="Notification Title" required maxlength="50">
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Message</label>
+                        <textarea id="notificationMessage" placeholder="Notification message" required maxlength="200" rows="3"></textarea>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Target Audience</label>
+                        <select id="notificationAudience" required>
+                            <option value="all">All Users</option>
+                            <option value="free">Free Users Only</option>
+                            <option value="premium">Premium Users Only</option>
+                        </select>
+                        
+                        <button type="submit" class="btn btn-primary">📤 Send Notification</button>
+                    </form>
+                </div>
+                
+                <div class="card">
+                    <h2>Recent Notifications</h2>
+                    <div id="notificationsList"></div>
                 </div>
             </div>
         </div>
@@ -751,6 +790,7 @@
             await loadCategories();
             await loadSubcategories();
             await loadMaterials();
+            await loadNotifications();
         }
     </script>
 </body>
