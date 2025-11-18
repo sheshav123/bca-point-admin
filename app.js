@@ -146,29 +146,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.editCategory = async (id, title, description, order, isPremium) => {
-        const newTitle = prompt('Edit Category Title:', title);
-        if (newTitle === null) return;
+        // Create a custom dialog for editing
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;';
+        dialog.innerHTML = `
+            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%;">
+                <h2 style="margin-top: 0;">Edit Category</h2>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Title:</label>
+                    <input type="text" id="editTitle" value="${title.replace(/"/g, '&quot;')}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Description:</label>
+                    <input type="text" id="editDescription" value="${(description || '').replace(/"/g, '&quot;')}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Order:</label>
+                    <input type="number" id="editOrder" value="${order}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="editIsPremium" ${isPremium ? 'checked' : ''} style="width: 20px; height: 20px; margin-right: 10px;">
+                        <span style="font-weight: bold;">👑 Premium Category</span>
+                    </label>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button id="cancelEdit" style="padding: 10px 20px; border: none; background: #e0e0e0; border-radius: 5px; cursor: pointer;">Cancel</button>
+                    <button id="saveEdit" style="padding: 10px 20px; border: none; background: #667eea; color: white; border-radius: 5px; cursor: pointer; font-weight: bold;">Save Changes</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(dialog);
         
-        const newDescription = prompt('Edit Description:', description);
-        if (newDescription === null) return;
+        document.getElementById('cancelEdit').onclick = () => {
+            document.body.removeChild(dialog);
+        };
         
-        const newOrder = prompt('Edit Order:', order);
-        if (newOrder === null) return;
-        
-        const premiumStatus = confirm('Mark as Premium Category?\n\nClick OK for Premium, Cancel for Free');
-        
-        try {
-            await updateDoc(doc(db, 'categories', id), {
-                title: newTitle,
-                description: newDescription || null,
-                order: parseInt(newOrder),
-                isPremium: premiumStatus
-            });
-            alert(premiumStatus ? '👑 Category updated as Premium!' : 'Category updated successfully!');
-            loadAllData();
-        } catch (error) {
-            alert('Error updating category: ' + error.message);
-        }
+        document.getElementById('saveEdit').onclick = async () => {
+            const newTitle = document.getElementById('editTitle').value;
+            const newDescription = document.getElementById('editDescription').value;
+            const newOrder = document.getElementById('editOrder').value;
+            const premiumStatus = document.getElementById('editIsPremium').checked;
+            
+            try {
+                await updateDoc(doc(db, 'categories', id), {
+                    title: newTitle,
+                    description: newDescription || null,
+                    order: parseInt(newOrder),
+                    isPremium: premiumStatus
+                });
+                alert(premiumStatus ? '👑 Category updated as Premium!' : 'Category updated successfully!');
+                document.body.removeChild(dialog);
+                loadAllData();
+            } catch (error) {
+                alert('Error updating category: ' + error.message);
+            }
+        };
     };
 
     window.deleteCategory = async (id) => {
