@@ -595,6 +595,8 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadCategories();
         await loadSubcategories();
         await loadMaterials();
-        await loadNotifications();
+        if (typeof loadNotifications === 'function') {
+            await loadNotifications();
+        }
     }
 });
