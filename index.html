@@ -238,6 +238,11 @@
                 
                 btn.classList.add('active');
                 document.getElementById(tabName).classList.add('active');
+                
+                // Load notifications when notifications tab is clicked
+                if (tabName === 'notifications') {
+                    loadNotifications();
+                }
             });
         });
 
