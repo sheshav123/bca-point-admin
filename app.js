@@ -498,6 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Notifications
     const notificationForm = document.getElementById('notificationForm');
     if (notificationForm) {
+        console.log('✅ Notification form found, attaching event listener');
         notificationForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -506,8 +507,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const message = document.getElementById('notificationMessage').value;
             const audience = document.getElementById('notificationAudience').value;
             
+            console.log('📤 Sending notification:', { type, title, message, audience });
+            
             try {
-                await addDoc(collection(db, 'notifications'), {
+                const docRef = await addDoc(collection(db, 'notifications'), {
                     type,
                     title,
                     message,
@@ -516,13 +519,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     read: false
                 });
                 
-                alert('📢 Notification sent successfully!');
+                console.log('✅ Notification sent with ID:', docRef.id);
+                alert('📢 Notification sent successfully!\n\nID: ' + docRef.id + '\n\nCheck your app now!');
                 e.target.reset();
                 loadNotifications();
             } catch (error) {
+                console.error('❌ Error sending notification:', error);
                 alert('Error sending notification: ' + error.message);
             }
         });
+    } else {
+        console.warn('⚠️ Notification form not found');
     }
 
     async function loadNotifications() {
