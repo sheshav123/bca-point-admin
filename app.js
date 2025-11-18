@@ -84,16 +84,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = document.getElementById('categoryTitle').value;
         const description = document.getElementById('categoryDescription').value;
         const order = parseInt(document.getElementById('categoryOrder').value);
+        const isPremium = document.getElementById('categoryIsPremium').checked;
         
         try {
             await addDoc(collection(db, 'categories'), {
                 title,
                 description: description || null,
                 order,
+                isPremium: isPremium,
                 createdAt: new Date().toISOString()
             });
             
-            alert('Category added successfully!');
+            alert(isPremium ? '👑 Premium category added successfully!' : 'Category added successfully!');
             e.target.reset();
             loadCategories();
         } catch (error) {
@@ -113,17 +115,23 @@ document.addEventListener('DOMContentLoaded', () => {
         
         snapshot.forEach((doc) => {
             const data = doc.data();
+            const isPremium = data.isPremium || false;
             
             // Add to list with edit button
             const item = document.createElement('div');
             item.className = 'item';
+            item.style.borderLeft = isPremium ? '4px solid #ffc107' : '';
             item.innerHTML = `
                 <div class="item-info">
-                    <h3>${data.title}</h3>
+                    <h3>
+                        ${isPremium ? '<span style="color: #ffc107; margin-right: 8px;">👑</span>' : ''}
+                        ${data.title}
+                        ${isPremium ? '<span style="background: linear-gradient(135deg, #ffc107, #ff9800); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">PREMIUM</span>' : ''}
+                    </h3>
                     <p>${data.description || 'No description'} • Order: ${data.order}</p>
                 </div>
                 <div class="item-actions">
-                    <button class="btn btn-edit" onclick="editCategory('${doc.id}', '${data.title.replace(/'/g, "\\'")}', '${(data.description || '').replace(/'/g, "\\'")}', ${data.order})">Edit</button>
+                    <button class="btn btn-edit" onclick="editCategory('${doc.id}', '${data.title.replace(/'/g, "\\'")}', '${(data.description || '').replace(/'/g, "\\'")}', ${data.order}, ${isPremium})">Edit</button>
                     <button class="btn btn-delete" onclick="deleteCategory('${doc.id}')">Delete</button>
                 </div>
             `;
@@ -132,12 +140,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add to parent select
             const option = document.createElement('option');
             option.value = `category_${doc.id}`;
-            option.textContent = `📁 ${data.title}`;
+            option.textContent = `${isPremium ? '👑 ' : '📁 '}${data.title}`;
             subcategoryParent.appendChild(option);
         });
     }
 
-    window.editCategory = async (id, title, description, order) => {
+    window.editCategory = async (id, title, description, order, isPremium) => {
         const newTitle = prompt('Edit Category Title:', title);
         if (newTitle === null) return;
         
@@ -147,13 +155,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const newOrder = prompt('Edit Order:', order);
         if (newOrder === null) return;
         
+        const premiumStatus = confirm('Mark as Premium Category?\n\nClick OK for Premium, Cancel for Free');
+        
         try {
             await updateDoc(doc(db, 'categories', id), {
                 title: newTitle,
                 description: newDescription || null,
-                order: parseInt(newOrder)
+                order: parseInt(newOrder),
+                isPremium: premiumStatus
             });
-            alert('Category updated successfully!');
+            alert(premiumStatus ? '👑 Category updated as Premium!' : 'Category updated successfully!');
             loadAllData();
         } catch (error) {
             alert('Error updating category: ' + error.message);

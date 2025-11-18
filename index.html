@@ -38,10 +38,21 @@
                         <input type="text" id="categoryTitle" placeholder="Category Title" required>
                         <textarea id="categoryDescription" placeholder="Description (optional)"></textarea>
                         <input type="number" id="categoryOrder" placeholder="Order" value="0" required>
+                        <div style="margin: 15px 0; padding: 12px; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
+                            <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600;">
+                                <input type="checkbox" id="categoryIsPremium" style="width: 20px; height: 20px; margin-right: 10px; cursor: pointer;">
+                                <span style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 20px;">👑</span>
+                                    <span>Mark as Premium Category</span>
+                                </span>
+                            </label>
+                            <p style="margin: 8px 0 0 30px; font-size: 13px; color: #856404;">
+                                Premium categories require users to purchase premium subscription
+                            </p>
+                        </div>
                         <button type="submit" class="btn btn-primary">Add Category</button>
                     </form>
-                </div>
-                <div class="card">
+                </div>                <div class="card">
                     <h2>Existing Categories</h2>
                     <div id="categoriesList"></div>
                 </div>
