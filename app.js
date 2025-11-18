@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = doc.data();
             const isPremium = data.isPremium || false;
             
-            // Add to list with edit button
+            // Add to list with toggle switch
             const item = document.createElement('div');
             item.className = 'item';
             item.style.borderLeft = isPremium ? '4px solid #ffc107' : '';
@@ -130,7 +130,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     </h3>
                     <p>${data.description || 'No description'} • Order: ${data.order}</p>
                 </div>
-                <div class="item-actions">
+                <div class="item-actions" style="display: flex; align-items: center; gap: 10px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <span style="font-size: 12px; font-weight: bold; color: #666;">Premium:</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${isPremium ? 'checked' : ''} onchange="togglePremiumStatus('${doc.id}', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </label>
                     <button class="btn btn-edit" onclick="editCategory('${doc.id}', '${data.title.replace(/'/g, "\\'")}', '${(data.description || '').replace(/'/g, "\\'")}', ${data.order}, ${isPremium})">Edit</button>
                     <button class="btn btn-delete" onclick="deleteCategory('${doc.id}')">Delete</button>
                 </div>
@@ -213,6 +220,17 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 alert('Error deleting category: ' + error.message);
             }
+        }
+    };
+
+    window.togglePremiumStatus = async (id, isPremium) => {
+        try {
+            await updateDoc(doc(db, 'categories', id), {
+                isPremium: isPremium
+            });
+            loadAllData();
+        } catch (error) {
+            alert('Error updating premium status: ' + error.message);
         }
     };
 
