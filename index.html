@@ -853,7 +853,7 @@
             });
         }
 
-        async function loadNotifications() {
+        window.loadNotifications = async function() {
             console.log('🔄 Loading notifications...');
             const notificationsList = document.getElementById('notificationsList');
             if (!notificationsList) {
@@ -915,7 +915,7 @@
             } catch (error) {
                 console.error('Error loading notifications:', error);
             }
-        }
+        };
 
         window.deleteNotification = async (id) => {
             if (confirm('Delete this notification?')) {
