@@ -496,37 +496,45 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Notifications
-    document.getElementById('notificationForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const type = document.getElementById('notificationType').value;
-        const title = document.getElementById('notificationTitle').value;
-        const message = document.getElementById('notificationMessage').value;
-        const audience = document.getElementById('notificationAudience').value;
-        
-        try {
-            await addDoc(collection(db, 'notifications'), {
-                type,
-                title,
-                message,
-                audience,
-                createdAt: new Date().toISOString(),
-                read: false
-            });
+    const notificationForm = document.getElementById('notificationForm');
+    if (notificationForm) {
+        notificationForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
             
-            alert('📢 Notification sent successfully!');
-            e.target.reset();
-            loadNotifications();
-        } catch (error) {
-            alert('Error sending notification: ' + error.message);
-        }
-    });
+            const type = document.getElementById('notificationType').value;
+            const title = document.getElementById('notificationTitle').value;
+            const message = document.getElementById('notificationMessage').value;
+            const audience = document.getElementById('notificationAudience').value;
+            
+            try {
+                await addDoc(collection(db, 'notifications'), {
+                    type,
+                    title,
+                    message,
+                    audience,
+                    createdAt: new Date().toISOString(),
+                    read: false
+                });
+                
+                alert('📢 Notification sent successfully!');
+                e.target.reset();
+                loadNotifications();
+            } catch (error) {
+                alert('Error sending notification: ' + error.message);
+            }
+        });
+    }
 
     async function loadNotifications() {
+        const notificationsList = document.getElementById('notificationsList');
+        if (!notificationsList) {
+            console.log('Notifications list element not found, skipping...');
+            return;
+        }
+        
         const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
         const snapshot = await getDocs(q);
         
-        const notificationsList = document.getElementById('notificationsList');
         notificationsList.innerHTML = '';
         
         if (snapshot.empty) {
