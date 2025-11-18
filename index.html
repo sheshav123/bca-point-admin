@@ -827,12 +827,18 @@
         }
 
         async function loadNotifications() {
+            console.log('🔄 Loading notifications...');
             const notificationsList = document.getElementById('notificationsList');
-            if (!notificationsList) return;
+            if (!notificationsList) {
+                console.error('❌ notificationsList element not found');
+                return;
+            }
             
             try {
                 const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
                 const snapshot = await getDocs(q);
+                
+                console.log(`📊 Found ${snapshot.size} notifications`);
                 
                 notificationsList.innerHTML = '';
                 
