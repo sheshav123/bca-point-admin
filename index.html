@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BCA Point 2.0 - Admin Panel</title>
+    <title>BCA Point 2.0 - Admin Panel v2.1</title>
+    <!-- Updated with notifications system -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -28,6 +29,7 @@
                 <button class="tab-btn active" data-tab="categories">Categories</button>
                 <button class="tab-btn" data-tab="subcategories">Subcategories</button>
                 <button class="tab-btn" data-tab="materials">Study Materials</button>
+                <button class="tab-btn" data-tab="notifications">📢 Notifications</button>
             </div>
 
             <!-- Categories Tab -->
@@ -120,6 +122,47 @@
                     <div id="materialsList"></div>
                 </div>
             </div>
+
+            <!-- Notifications Tab -->
+            <div id="notifications" class="tab-content">
+                <div class="card">
+                    <h2>📢 Send In-App Notification</h2>
+                    <form id="notificationForm">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Notification Type</label>
+                        <select id="notificationType" required>
+                            <option value="">Select Type</option>
+                            <option value="new_category">🆕 New Category Added</option>
+                            <option value="new_material">📄 New Material Added</option>
+                            <option value="premium">👑 Join Premium</option>
+                            <option value="announcement">📣 General Announcement</option>
+                            <option value="update">🔄 App Update</option>
+                        </select>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Title</label>
+                        <input type="text" id="notificationTitle" placeholder="Notification Title" required maxlength="50">
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Message</label>
+                        <textarea id="notificationMessage" placeholder="Notification message" required maxlength="200" rows="3"></textarea>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Target Audience</label>
+                        <select id="notificationAudience" required>
+                            <option value="all">All Users</option>
+                            <option value="free">Free Users Only</option>
+                            <option value="premium">Premium Users Only</option>
+                        </select>
+                        
+                        <button type="submit" class="btn btn-primary">📤 Send Notification</button>
+                    </form>
+                </div>
+                
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">Recent Notifications</h2>
+                        <button id="refreshNotificationsBtn" class="btn btn-primary" style="padding: 8px 16px; font-size: 14px;">🔄 Refresh</button>
+                    </div>
+                    <div id="notificationsList"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -198,6 +241,11 @@
                 
                 btn.classList.add('active');
                 document.getElementById(tabName).classList.add('active');
+                
+                // Load notifications when notifications tab is clicked
+                if (tabName === 'notifications') {
+                    loadNotifications();
+                }
             });
         });
 
@@ -244,17 +292,30 @@
             
             snapshot.forEach((doc) => {
                 const data = doc.data();
+                const isPremium = data.isPremium || false;
                 allCategories.push({ id: doc.id, ...data });
                 
                 const item = document.createElement('div');
                 item.className = 'item';
+                item.style.borderLeft = isPremium ? '4px solid #ffc107' : '';
                 item.innerHTML = `
                     <div class="item-info">
-                        <h3>${data.title}</h3>
+                        <h3>
+                            ${isPremium ? '<span style="color: #ffc107; margin-right: 8px;">👑</span>' : ''}
+                            ${data.title}
+                            ${isPremium ? '<span style="background: linear-gradient(135deg, #ffc107, #ff9800); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">PREMIUM</span>' : ''}
+                        </h3>
                         <p>${data.description || 'No description'} • Order: ${data.order}</p>
                     </div>
-                    <div class="item-actions">
-                        <button class="btn btn-edit" onclick="editCategory('${doc.id}', '${data.title.replace(/'/g, "\\'")}', '${(data.description || '').replace(/'/g, "\\'")}', ${data.order})">Edit</button>
+                    <div class="item-actions" style="display: flex; align-items: center; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <span style="font-size: 12px; font-weight: bold; color: #666;">Premium:</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${isPremium ? 'checked' : ''} onchange="togglePremiumStatus('${doc.id}', this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <button class="btn btn-edit" onclick="editCategory('${doc.id}', '${data.title.replace(/'/g, "\\'")}', '${(data.description || '').replace(/'/g, "\\'")}', ${data.order}, ${isPremium})">Edit</button>
                         <button class="btn btn-delete" onclick="deleteCategory('${doc.id}')">Delete</button>
                     </div>
                 `;
@@ -395,6 +456,17 @@
                 loadAllData();
             } catch (error) {
                 alert('Error updating category: ' + error.message);
+            }
+        };
+
+        window.togglePremiumStatus = async (id, isPremium) => {
+            try {
+                await updateDoc(doc(db, 'categories', id), {
+                    isPremium: isPremium
+                });
+                loadCategories();
+            } catch (error) {
+                alert('Error updating premium status: ' + error.message);
             }
         };
 
@@ -746,10 +818,131 @@
             }
         };
 
+        // Notifications
+        const notificationForm = document.getElementById('notificationForm');
+        if (notificationForm) {
+            console.log('✅ Notification form found');
+            notificationForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const type = document.getElementById('notificationType').value;
+                const title = document.getElementById('notificationTitle').value;
+                const message = document.getElementById('notificationMessage').value;
+                const audience = document.getElementById('notificationAudience').value;
+                
+                console.log('📤 Sending notification:', { type, title, message, audience });
+                
+                try {
+                    const docRef = await addDoc(collection(db, 'notifications'), {
+                        type,
+                        title,
+                        message,
+                        audience,
+                        createdAt: new Date().toISOString(),
+                        read: false
+                    });
+                    
+                    console.log('✅ Notification sent with ID:', docRef.id);
+                    alert('📢 Notification sent successfully!\n\nCheck your app now!');
+                    e.target.reset();
+                    loadNotifications();
+                } catch (error) {
+                    console.error('❌ Error:', error);
+                    alert('Error: ' + error.message);
+                }
+            });
+        }
+
+        window.loadNotifications = async function() {
+            console.log('🔄 Loading notifications...');
+            const notificationsList = document.getElementById('notificationsList');
+            if (!notificationsList) {
+                console.error('❌ notificationsList element not found');
+                return;
+            }
+            
+            console.log('✅ notificationsList element found');
+            
+            try {
+                const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
+                const snapshot = await getDocs(q);
+                
+                console.log(`📊 Found ${snapshot.size} notifications`);
+                
+                notificationsList.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    notificationsList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No notifications sent yet</p>';
+                    return;
+                }
+                
+                const typeIcons = {
+                    'new_category': '🆕',
+                    'new_material': '📄',
+                    'premium': '👑',
+                    'announcement': '📣',
+                    'update': '🔄'
+                };
+                
+                const audienceLabels = {
+                    'all': 'All Users',
+                    'free': 'Free Users',
+                    'premium': 'Premium Users'
+                };
+                
+                let count = 0;
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    console.log(`📝 Notification ${++count}:`, data);
+                    const date = new Date(data.createdAt).toLocaleString();
+                    
+                    const item = document.createElement('div');
+                    item.className = 'item';
+                    item.innerHTML = `
+                        <div class="item-info">
+                            <h3>${typeIcons[data.type] || '📢'} ${data.title}</h3>
+                            <p>${data.message}</p>
+                            <p style="font-size: 12px; color: #999; margin-top: 5px;">
+                                👥 ${audienceLabels[data.audience]} • 📅 ${date}
+                            </p>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-delete" onclick="deleteNotification('${doc.id}')">Delete</button>
+                        </div>
+                    `;
+                    notificationsList.appendChild(item);
+                    console.log(`✅ Added notification to list: ${data.title}`);
+                });
+                console.log(`✨ Total notifications displayed: ${count}`);
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+            }
+        };
+
+        window.deleteNotification = async (id) => {
+            if (confirm('Delete this notification?')) {
+                try {
+                    await deleteDoc(doc(db, 'notifications', id));
+                    alert('Deleted!');
+                    loadNotifications();
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
+            }
+        };
+
+        // Attach refresh button event listener
+        const refreshBtn = document.getElementById('refreshNotificationsBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', loadNotifications);
+            console.log('✅ Refresh button event listener attached');
+        }
+
         async function loadAllData() {
             await loadCategories();
             await loadSubcategories();
             await loadMaterials();
+            await loadNotifications();
         }
     </script>
 </body>
