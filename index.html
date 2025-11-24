@@ -109,7 +109,22 @@
                         <input type="text" id="materialTitle" placeholder="Material Title" required>
                         <textarea id="materialDescription" placeholder="Description (optional)"></textarea>
                         <input type="file" id="materialPdf" accept=".pdf" required>
+                        <label style="font-weight: 600; margin-bottom: 5px; margin-top: 10px; display: block;">Images (Optional)</label>
+                        <input type="file" id="materialImages" accept="image/*" multiple>
+                        <p style="font-size: 12px; color: #666; margin-top: 5px;">You can select multiple images to attach with this material</p>
                         <input type="number" id="materialOrder" placeholder="Order" value="0" required>
+                        <div style="margin: 15px 0; padding: 12px; background: #e8f5e9; border-radius: 8px; border: 2px solid #4caf50;">
+                            <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600;">
+                                <input type="checkbox" id="materialIsAdFree" style="width: 20px; height: 20px; margin-right: 10px; cursor: pointer;">
+                                <span style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 20px;">🚫</span>
+                                    <span>Make this material Ad-Free</span>
+                                </span>
+                            </label>
+                            <p style="margin: 8px 0 0 30px; font-size: 13px; color: #2e7d32;">
+                                Ad-free materials won't show any banner or rewarded ads
+                            </p>
+                        </div>
                         <button type="submit" class="btn btn-primary">Upload Material</button>
                         <div id="uploadProgress" style="display: none;">
                             <progress id="progressBar" value="0" max="100"></progress>
@@ -702,42 +717,70 @@
             const title = document.getElementById('materialTitle').value;
             const description = document.getElementById('materialDescription').value;
             const order = parseInt(document.getElementById('materialOrder').value);
-            const file = document.getElementById('materialPdf').files[0];
+            const isAdFree = document.getElementById('materialIsAdFree').checked;
+            const pdfFile = document.getElementById('materialPdf').files[0];
+            const imageFiles = document.getElementById('materialImages').files;
             
-            if (!file) {
+            if (!pdfFile) {
                 alert('Please select a PDF file');
                 return;
             }
             
             try {
                 document.getElementById('uploadProgress').style.display = 'block';
+                document.getElementById('progressText').textContent = 'Uploading PDF...';
                 
-                const storageRef = ref(storage, `study_materials/${Date.now()}_${file.name}`);
-                const uploadTask = uploadBytesResumable(storageRef, file);
+                // Upload PDF
+                const pdfStorageRef = ref(storage, `study_materials/${Date.now()}_${pdfFile.name}`);
+                const pdfUploadTask = uploadBytesResumable(pdfStorageRef, pdfFile);
                 
-                uploadTask.on('state_changed',
+                pdfUploadTask.on('state_changed',
                     (snapshot) => {
                         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                         document.getElementById('progressBar').value = progress;
-                        document.getElementById('progressText').textContent = Math.round(progress) + '%';
+                        document.getElementById('progressText').textContent = `Uploading PDF... ${Math.round(progress)}%`;
                     },
                     (error) => {
-                        alert('Upload error: ' + error.message);
+                        alert('PDF upload error: ' + error.message);
                         document.getElementById('uploadProgress').style.display = 'none';
                     },
                     async () => {
-                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        const pdfDownloadURL = await getDownloadURL(pdfUploadTask.snapshot.ref);
                         
+                        // Upload images if any
+                        const imageUrls = [];
+                        if (imageFiles.length > 0) {
+                            document.getElementById('progressText').textContent = 'Uploading images...';
+                            
+                            for (let i = 0; i < imageFiles.length; i++) {
+                                const imageFile = imageFiles[i];
+                                const imageStorageRef = ref(storage, `study_materials/images/${Date.now()}_${i}_${imageFile.name}`);
+                                
+                                document.getElementById('progressText').textContent = `Uploading image ${i + 1}/${imageFiles.length}...`;
+                                
+                                const imageSnapshot = await uploadBytesResumable(imageStorageRef, imageFile);
+                                const imageUrl = await getDownloadURL(imageSnapshot.ref);
+                                imageUrls.push(imageUrl);
+                            }
+                        }
+                        
+                        // Save to Firestore
                         await addDoc(collection(db, 'studyMaterials'), {
                             subcategoryId,
                             title,
                             description: description || null,
-                            pdfUrl: downloadURL,
+                            pdfUrl: pdfDownloadURL,
+                            imageUrls: imageUrls,
+                            isAdFree: isAdFree,
                             order,
                             createdAt: new Date().toISOString()
                         });
                         
-                        alert('Study material uploaded successfully!');
+                        const message = isAdFree 
+                            ? '✅ Ad-free study material uploaded successfully!' 
+                            : '✅ Study material uploaded successfully!';
+                        alert(message + (imageUrls.length > 0 ? `\n📷 ${imageUrls.length} image(s) attached` : ''));
+                        
                         e.target.reset();
                         document.getElementById('uploadProgress').style.display = 'none';
                         loadMaterials();
@@ -765,16 +808,34 @@
             snapshot.forEach((doc) => {
                 const data = doc.data();
                 const subcategoryTitle = subcategoriesMap[data.subcategoryId] || 'Unknown';
+                const isAdFree = data.isAdFree || false;
+                const imageCount = (data.imageUrls && data.imageUrls.length) || 0;
                 
                 const item = document.createElement('div');
                 item.className = 'item';
+                item.style.borderLeft = isAdFree ? '4px solid #4caf50' : '';
                 item.innerHTML = `
                     <div class="item-info">
-                        <h3>${data.title}</h3>
+                        <h3>
+                            ${isAdFree ? '<span style="color: #4caf50; margin-right: 8px;">🚫</span>' : ''}
+                            ${data.title}
+                            ${isAdFree ? '<span style="background: linear-gradient(135deg, #4caf50, #66bb6a); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">AD-FREE</span>' : ''}
+                            ${imageCount > 0 ? `<span style="background: #2196f3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">📷 ${imageCount}</span>` : ''}
+                        </h3>
                         <p>Subcategory: ${subcategoryTitle} • ${data.description || 'No description'} • Order: ${data.order}</p>
-                        <a href="${data.pdfUrl}" target="_blank" style="color: #667eea; font-size: 14px;">View PDF</a>
+                        <div style="margin-top: 8px;">
+                            <a href="${data.pdfUrl}" target="_blank" style="color: #667eea; font-size: 14px; margin-right: 15px;">📄 View PDF</a>
+                            ${imageCount > 0 ? `<span style="color: #2196f3; font-size: 14px;">📷 ${imageCount} image(s)</span>` : ''}
+                        </div>
                     </div>
-                    <div class="item-actions">
+                    <div class="item-actions" style="display: flex; align-items: center; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <span style="font-size: 12px; font-weight: bold; color: #666;">Ad-Free:</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${isAdFree ? 'checked' : ''} onchange="toggleMaterialAdFree('${doc.id}', this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
                         <button class="btn btn-edit" onclick="editMaterial('${doc.id}', '${data.title.replace(/'/g, "\\'")}', '${(data.description || '').replace(/'/g, "\\'")}', ${data.order})">Edit</button>
                         <button class="btn btn-delete" onclick="deleteMaterial('${doc.id}')">Delete</button>
                     </div>
@@ -782,6 +843,17 @@
                 materialsList.appendChild(item);
             });
         }
+        
+        window.toggleMaterialAdFree = async (id, isAdFree) => {
+            try {
+                await updateDoc(doc(db, 'studyMaterials', id), {
+                    isAdFree: isAdFree
+                });
+                loadMaterials();
+            } catch (error) {
+                alert('Error updating ad-free status: ' + error.message);
+            }
+        };
 
         window.editMaterial = async (id, title, description, order) => {
             const newTitle = prompt('Edit Material Title:', title);
