@@ -29,7 +29,8 @@
                 <button class="tab-btn active" data-tab="categories">Categories</button>
                 <button class="tab-btn" data-tab="subcategories">Subcategories</button>
                 <button class="tab-btn" data-tab="materials">Study Materials</button>
-                <button class="tab-btn" data-tab="notifications">📢 Notifications</button>
+                <button class="tab-btn" data-tab="customads">📢 Custom Ads</button>
+                <button class="tab-btn" data-tab="notifications">🔔 Notifications</button>
             </div>
 
             <!-- Categories Tab -->
@@ -143,6 +144,60 @@
                 <div class="card">
                     <h2>Existing Study Materials</h2>
                     <div id="materialsList"></div>
+                </div>
+            </div>
+
+            <!-- Custom Ads Tab -->
+            <div id="customads" class="tab-content">
+                <div class="card">
+                    <h2>Create Custom Ad</h2>
+                    <p style="color: #666; margin-bottom: 15px;">Create full-screen popup ads that appear when users open the app</p>
+                    <form id="customAdForm">
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Ad Title</label>
+                        <input type="text" id="adTitle" placeholder="e.g., Special Offer!" required>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Description</label>
+                        <textarea id="adDescription" placeholder="Ad description" rows="3"></textarea>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Ad Image</label>
+                        <input type="file" id="adImage" accept="image/*" required>
+                        <p style="font-size: 12px; color: #666; margin-top: 5px;">Recommended: 1080x1080px or 16:9 ratio</p>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Button Text</label>
+                        <input type="text" id="adButtonText" placeholder="e.g., Click Here to Know More" value="Click Here to Know More" required>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Button Link (URL)</label>
+                        <input type="url" id="adButtonLink" placeholder="https://example.com" required>
+                        <p style="font-size: 12px; color: #666; margin-top: 5px;">Where users will be redirected when they click the button</p>
+                        
+                        <label style="font-weight: 600; margin-bottom: 5px; display: block;">Display Order</label>
+                        <input type="number" id="adOrder" placeholder="Order" value="0" required>
+                        <p style="font-size: 12px; color: #666; margin-top: 5px;">Lower numbers show first</p>
+                        
+                        <div style="margin: 15px 0; padding: 12px; background: #e8f5e9; border-radius: 8px; border: 2px solid #4caf50;">
+                            <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600;">
+                                <input type="checkbox" id="adIsEnabled" checked style="width: 20px; height: 20px; margin-right: 10px; cursor: pointer;">
+                                <span style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 20px;">✅</span>
+                                    <span>Enable this ad</span>
+                                </span>
+                            </label>
+                            <p style="margin: 8px 0 0 30px; font-size: 13px; color: #2e7d32;">
+                                Only enabled ads will be shown to users
+                            </p>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Create Ad</button>
+                        <div id="adUploadProgress" style="display: none; margin-top: 15px;">
+                            <progress id="adProgressBar" value="0" max="100" style="width: 100%;"></progress>
+                            <span id="adProgressText">0%</span>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="card">
+                    <h2>Existing Custom Ads</h2>
+                    <div id="customAdsList"></div>
                 </div>
             </div>
 
@@ -1068,10 +1123,143 @@
             console.log('✅ Refresh button event listener attached');
         }
 
+        // Custom Ads Management
+        document.getElementById('customAdForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const title = document.getElementById('adTitle').value;
+            const description = document.getElementById('adDescription').value;
+            const buttonText = document.getElementById('adButtonText').value;
+            const buttonLink = document.getElementById('adButtonLink').value;
+            const order = parseInt(document.getElementById('adOrder').value);
+            const isEnabled = document.getElementById('adIsEnabled').checked;
+            const imageFile = document.getElementById('adImage').files[0];
+            
+            if (!imageFile) {
+                alert('Please select an image');
+                return;
+            }
+            
+            try {
+                document.getElementById('adUploadProgress').style.display = 'block';
+                document.getElementById('adProgressText').textContent = 'Uploading image...';
+                
+                // Upload image
+                const imageStorageRef = ref(storage, `custom_ads/${Date.now()}_${imageFile.name}`);
+                const imageUploadTask = uploadBytesResumable(imageStorageRef, imageFile);
+                
+                imageUploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        document.getElementById('adProgressBar').value = progress;
+                        document.getElementById('adProgressText').textContent = `Uploading... ${Math.round(progress)}%`;
+                    },
+                    (error) => {
+                        alert('Upload error: ' + error.message);
+                        document.getElementById('adUploadProgress').style.display = 'none';
+                    },
+                    async () => {
+                        const imageUrl = await getDownloadURL(imageUploadTask.snapshot.ref);
+                        
+                        // Save to Firestore
+                        await addDoc(collection(db, 'customAds'), {
+                            title,
+                            description: description || '',
+                            imageUrl,
+                            buttonText,
+                            buttonLink,
+                            isEnabled,
+                            order,
+                            createdAt: new Date().toISOString()
+                        });
+                        
+                        alert('✅ Custom ad created successfully!');
+                        e.target.reset();
+                        document.getElementById('adUploadProgress').style.display = 'none';
+                        loadCustomAds();
+                    }
+                );
+            } catch (error) {
+                alert('Error creating ad: ' + error.message);
+                document.getElementById('adUploadProgress').style.display = 'none';
+            }
+        });
+
+        async function loadCustomAds() {
+            const q = query(collection(db, 'customAds'), orderBy('order'));
+            const snapshot = await getDocs(q);
+            
+            const adsList = document.getElementById('customAdsList');
+            adsList.innerHTML = '';
+            
+            if (snapshot.empty) {
+                adsList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No custom ads created yet</p>';
+                return;
+            }
+            
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const isEnabled = data.isEnabled || false;
+                
+                const item = document.createElement('div');
+                item.className = 'item';
+                item.style.borderLeft = isEnabled ? '4px solid #4caf50' : '4px solid #f44336';
+                item.innerHTML = `
+                    <div class="item-info">
+                        <h3>
+                            ${isEnabled ? '<span style="color: #4caf50; margin-right: 8px;">✅</span>' : '<span style="color: #f44336; margin-right: 8px;">❌</span>'}
+                            ${data.title}
+                            ${isEnabled ? '<span style="background: #4caf50; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">ENABLED</span>' : '<span style="background: #f44336; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">DISABLED</span>'}
+                        </h3>
+                        <p>${data.description || 'No description'} • Order: ${data.order}</p>
+                        <div style="margin-top: 8px;">
+                            <a href="${data.imageUrl}" target="_blank" style="color: #667eea; font-size: 14px; margin-right: 15px;">🖼️ View Image</a>
+                            <span style="color: #666; font-size: 14px;">Button: "${data.buttonText}" → ${data.buttonLink}</span>
+                        </div>
+                    </div>
+                    <div class="item-actions" style="display: flex; align-items: center; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <span style="font-size: 12px; font-weight: bold; color: #666;">Enabled:</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="toggleAdEnabled('${doc.id}', this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <button class="btn btn-delete" onclick="deleteCustomAd('${doc.id}')">Delete</button>
+                    </div>
+                `;
+                adsList.appendChild(item);
+            });
+        }
+
+        window.toggleAdEnabled = async (id, isEnabled) => {
+            try {
+                await updateDoc(doc(db, 'customAds', id), {
+                    isEnabled: isEnabled
+                });
+                loadCustomAds();
+            } catch (error) {
+                alert('Error updating ad status: ' + error.message);
+            }
+        };
+
+        window.deleteCustomAd = async (id) => {
+            if (confirm('Are you sure you want to delete this ad?')) {
+                try {
+                    await deleteDoc(doc(db, 'customAds', id));
+                    alert('Ad deleted successfully!');
+                    loadCustomAds();
+                } catch (error) {
+                    alert('Error deleting ad: ' + error.message);
+                }
+            }
+        };
+
         async function loadAllData() {
             await loadCategories();
             await loadSubcategories();
             await loadMaterials();
+            await loadCustomAds();
             await loadNotifications();
         }
     </script>
