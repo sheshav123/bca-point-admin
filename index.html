@@ -148,8 +148,30 @@
 
             <!-- Notifications Tab -->
             <div id="notifications" class="tab-content">
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 20px;">
+                    <div style="padding: 20px;">
+                        <h2 style="color: white; margin: 0 0 10px 0;">📱 Push Notifications</h2>
+                        <p style="margin: 0 0 15px 0; opacity: 0.9;">Send notifications that appear in users' notification tray (even when app is closed)</p>
+                        <a href="https://console.firebase.google.com/project/bca-point-2/messaging" target="_blank" 
+                           style="display: inline-block; background: white; color: #667eea; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                            🚀 Open Firebase Console to Send Push Notifications
+                        </a>
+                        <div style="margin-top: 15px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                            <p style="margin: 0 0 8px 0; font-weight: bold;">Quick Steps:</p>
+                            <ol style="margin: 0; padding-left: 20px;">
+                                <li>Click button above to open Firebase Console</li>
+                                <li>Click "New campaign" → "Firebase Notification messages"</li>
+                                <li>Enter title and message</li>
+                                <li>Select "All users" or specific audience</li>
+                                <li>Click "Publish" - Done! ✅</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="card">
                     <h2>📢 Send In-App Notification</h2>
+                    <p style="color: #666; margin-bottom: 15px;">These notifications appear inside the app only (not in system notification tray)</p>
                     <form id="notificationForm">
                         <label style="font-weight: 600; margin-bottom: 5px; display: block;">Notification Type</label>
                         <select id="notificationType" required>
