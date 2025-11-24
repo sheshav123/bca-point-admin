@@ -108,10 +108,18 @@
                         <label style="font-weight: 600; margin-bottom: 5px; margin-top: 15px; display: block;">Step 2: Enter Material Details</label>
                         <input type="text" id="materialTitle" placeholder="Material Title" required>
                         <textarea id="materialDescription" placeholder="Description (optional)"></textarea>
-                        <input type="file" id="materialPdf" accept=".pdf" required>
-                        <label style="font-weight: 600; margin-bottom: 5px; margin-top: 10px; display: block;">Images (Optional)</label>
-                        <input type="file" id="materialImages" accept="image/*" multiple>
-                        <p style="font-size: 12px; color: #666; margin-top: 5px;">You can select multiple images to attach with this material</p>
+                        
+                        <div style="margin: 15px 0; padding: 15px; background: #f0f8ff; border-radius: 8px; border: 2px solid #2196f3;">
+                            <p style="font-weight: bold; margin: 0 0 10px 0; color: #1976d2;">📎 Upload Content (Choose at least one)</p>
+                            
+                            <label style="font-weight: 600; margin-bottom: 5px; display: block;">PDF File (Optional)</label>
+                            <input type="file" id="materialPdf" accept=".pdf">
+                            <p style="font-size: 12px; color: #666; margin: 5px 0 15px 0;">Upload a PDF document</p>
+                            
+                            <label style="font-weight: 600; margin-bottom: 5px; display: block;">Images (Optional)</label>
+                            <input type="file" id="materialImages" accept="image/*" multiple>
+                            <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">Upload one or multiple images (JPG, PNG, etc.)</p>
+                        </div>
                         <input type="number" id="materialOrder" placeholder="Order" value="0" required>
                         <div style="margin: 15px 0; padding: 12px; background: #e8f5e9; border-radius: 8px; border: 2px solid #4caf50;">
                             <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600;">
@@ -721,71 +729,84 @@
             const pdfFile = document.getElementById('materialPdf').files[0];
             const imageFiles = document.getElementById('materialImages').files;
             
-            if (!pdfFile) {
-                alert('Please select a PDF file');
+            // Validate: At least one file (PDF or images) must be selected
+            if (!pdfFile && imageFiles.length === 0) {
+                alert('⚠️ Please upload at least one file:\n• PDF document, OR\n• One or more images, OR\n• Both PDF and images');
                 return;
             }
             
             try {
                 document.getElementById('uploadProgress').style.display = 'block';
-                document.getElementById('progressText').textContent = 'Uploading PDF...';
+                let pdfDownloadURL = null;
                 
-                // Upload PDF
-                const pdfStorageRef = ref(storage, `study_materials/${Date.now()}_${pdfFile.name}`);
-                const pdfUploadTask = uploadBytesResumable(pdfStorageRef, pdfFile);
-                
-                pdfUploadTask.on('state_changed',
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        document.getElementById('progressBar').value = progress;
-                        document.getElementById('progressText').textContent = `Uploading PDF... ${Math.round(progress)}%`;
-                    },
-                    (error) => {
-                        alert('PDF upload error: ' + error.message);
-                        document.getElementById('uploadProgress').style.display = 'none';
-                    },
-                    async () => {
-                        const pdfDownloadURL = await getDownloadURL(pdfUploadTask.snapshot.ref);
-                        
-                        // Upload images if any
-                        const imageUrls = [];
-                        if (imageFiles.length > 0) {
-                            document.getElementById('progressText').textContent = 'Uploading images...';
-                            
-                            for (let i = 0; i < imageFiles.length; i++) {
-                                const imageFile = imageFiles[i];
-                                const imageStorageRef = ref(storage, `study_materials/images/${Date.now()}_${i}_${imageFile.name}`);
-                                
-                                document.getElementById('progressText').textContent = `Uploading image ${i + 1}/${imageFiles.length}...`;
-                                
-                                const imageSnapshot = await uploadBytesResumable(imageStorageRef, imageFile);
-                                const imageUrl = await getDownloadURL(imageSnapshot.ref);
-                                imageUrls.push(imageUrl);
+                // Upload PDF if provided
+                if (pdfFile) {
+                    document.getElementById('progressText').textContent = 'Uploading PDF...';
+                    
+                    const pdfStorageRef = ref(storage, `study_materials/${Date.now()}_${pdfFile.name}`);
+                    const pdfUploadTask = uploadBytesResumable(pdfStorageRef, pdfFile);
+                    
+                    await new Promise((resolve, reject) => {
+                        pdfUploadTask.on('state_changed',
+                            (snapshot) => {
+                                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                                document.getElementById('progressBar').value = progress;
+                                document.getElementById('progressText').textContent = `Uploading PDF... ${Math.round(progress)}%`;
+                            },
+                            (error) => {
+                                reject(error);
+                            },
+                            async () => {
+                                pdfDownloadURL = await getDownloadURL(pdfUploadTask.snapshot.ref);
+                                resolve();
                             }
-                        }
+                        );
+                    });
+                }
+                
+                // Upload images if any
+                const imageUrls = [];
+                if (imageFiles.length > 0) {
+                    document.getElementById('progressText').textContent = 'Uploading images...';
+                    
+                    for (let i = 0; i < imageFiles.length; i++) {
+                        const imageFile = imageFiles[i];
+                        const imageStorageRef = ref(storage, `study_materials/images/${Date.now()}_${i}_${imageFile.name}`);
                         
-                        // Save to Firestore
-                        await addDoc(collection(db, 'studyMaterials'), {
-                            subcategoryId,
-                            title,
-                            description: description || null,
-                            pdfUrl: pdfDownloadURL,
-                            imageUrls: imageUrls,
-                            isAdFree: isAdFree,
-                            order,
-                            createdAt: new Date().toISOString()
-                        });
+                        document.getElementById('progressText').textContent = `Uploading image ${i + 1}/${imageFiles.length}...`;
                         
-                        const message = isAdFree 
-                            ? '✅ Ad-free study material uploaded successfully!' 
-                            : '✅ Study material uploaded successfully!';
-                        alert(message + (imageUrls.length > 0 ? `\n📷 ${imageUrls.length} image(s) attached` : ''));
-                        
-                        e.target.reset();
-                        document.getElementById('uploadProgress').style.display = 'none';
-                        loadMaterials();
+                        const imageSnapshot = await uploadBytesResumable(imageStorageRef, imageFile);
+                        const imageUrl = await getDownloadURL(imageSnapshot.ref);
+                        imageUrls.push(imageUrl);
                     }
-                );
+                }
+                
+                // Save to Firestore
+                await addDoc(collection(db, 'studyMaterials'), {
+                    subcategoryId,
+                    title,
+                    description: description || null,
+                    pdfUrl: pdfDownloadURL, // Can be null if only images
+                    imageUrls: imageUrls,
+                    isAdFree: isAdFree,
+                    order,
+                    createdAt: new Date().toISOString()
+                });
+                
+                // Success message
+                let message = isAdFree ? '✅ Ad-free material uploaded successfully!' : '✅ Material uploaded successfully!';
+                if (pdfDownloadURL && imageUrls.length > 0) {
+                    message += `\n📄 PDF + 📷 ${imageUrls.length} image(s)`;
+                } else if (pdfDownloadURL) {
+                    message += '\n📄 PDF only';
+                } else if (imageUrls.length > 0) {
+                    message += `\n📷 ${imageUrls.length} image(s) only`;
+                }
+                alert(message);
+                
+                e.target.reset();
+                document.getElementById('uploadProgress').style.display = 'none';
+                loadMaterials();
             } catch (error) {
                 alert('Error uploading material: ' + error.message);
                 document.getElementById('uploadProgress').style.display = 'none';
@@ -810,6 +831,21 @@
                 const subcategoryTitle = subcategoriesMap[data.subcategoryId] || 'Unknown';
                 const isAdFree = data.isAdFree || false;
                 const imageCount = (data.imageUrls && data.imageUrls.length) || 0;
+                const hasPdf = data.pdfUrl && data.pdfUrl.length > 0;
+                
+                // Determine content type
+                let contentType = '';
+                let contentBadge = '';
+                if (hasPdf && imageCount > 0) {
+                    contentType = 'PDF + Images';
+                    contentBadge = '<span style="background: #9c27b0; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">📄+📷</span>';
+                } else if (hasPdf) {
+                    contentType = 'PDF Only';
+                    contentBadge = '<span style="background: #f44336; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">📄 PDF</span>';
+                } else if (imageCount > 0) {
+                    contentType = 'Images Only';
+                    contentBadge = '<span style="background: #2196f3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">📷 IMG</span>';
+                }
                 
                 const item = document.createElement('div');
                 item.className = 'item';
@@ -819,13 +855,13 @@
                         <h3>
                             ${isAdFree ? '<span style="color: #4caf50; margin-right: 8px;">🚫</span>' : ''}
                             ${data.title}
+                            ${contentBadge}
                             ${isAdFree ? '<span style="background: linear-gradient(135deg, #4caf50, #66bb6a); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">AD-FREE</span>' : ''}
-                            ${imageCount > 0 ? `<span style="background: #2196f3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: bold;">📷 ${imageCount}</span>` : ''}
                         </h3>
                         <p>Subcategory: ${subcategoryTitle} • ${data.description || 'No description'} • Order: ${data.order}</p>
                         <div style="margin-top: 8px;">
-                            <a href="${data.pdfUrl}" target="_blank" style="color: #667eea; font-size: 14px; margin-right: 15px;">📄 View PDF</a>
-                            ${imageCount > 0 ? `<span style="color: #2196f3; font-size: 14px;">📷 ${imageCount} image(s)</span>` : ''}
+                            ${hasPdf ? `<a href="${data.pdfUrl}" target="_blank" style="color: #667eea; font-size: 14px; margin-right: 15px;">📄 View PDF</a>` : ''}
+                            ${imageCount > 0 ? `<span style="color: #2196f3; font-size: 14px;">${hasPdf ? '' : '📷 '}${imageCount} image(s)${hasPdf ? '' : ' only'}</span>` : ''}
                         </div>
                     </div>
                     <div class="item-actions" style="display: flex; align-items: center; gap: 10px;">
